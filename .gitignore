@@ -1,0 +1,4 @@
+# Tested-commit log (machine-local; normally ~/.mesa_test/, see README)
+tested_commits.csv
+tested_commits.csv.lock
+.tested_commits.*.tmp

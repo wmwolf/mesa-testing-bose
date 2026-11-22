@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stub for Lmod's `module`: does nothing.
+exit 0

@@ -10,6 +10,10 @@
 # Required environment variables (set via --export when submitting):
 #   MESA_TEST_DIR   Path to the MESA worktree to remove.
 #   STATUS_FILE     Path to the mktemp status file to remove.
+#
+# Optional environment variables:
+#   MESA_RUN_ID     Row of the tested-commit log (MESA_RUN_LOG) to stamp with
+#                   a completion time. Set by run_mesa_tests.sh.
 
 #SBATCH --nodes=1
 #SBATCH --no-requeue
@@ -19,6 +23,23 @@ set -euo pipefail
 
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "${SCRIPT_DIR}/config.sh"
+
+# ── Record completion in the tested-commit log ────────────────────────────────
+# This job only runs once every module array has finished, so its start is
+# when testing completed. Recorded on any exit (including "nothing to remove"
+# and refusals below), and never allowed to change this job's exit status.
+record_completion() {
+    local status=$?
+    if [[ -n "${MESA_RUN_ID:-}" ]]; then
+        if run_log set --run-id "${MESA_RUN_ID}" completed_at "$(date -Iseconds)"; then
+            echo "Recorded completion of run ${MESA_RUN_ID} in ${MESA_RUN_LOG}"
+        else
+            echo "WARNING: could not record completion of run ${MESA_RUN_ID} in ${MESA_RUN_LOG}." >&2
+        fi
+    fi
+    exit "${status}"
+}
+trap record_completion EXIT
 
 : "${MESA_TEST_DIR:?MESA_TEST_DIR must be set (passed via --export)}"
 : "${STATUS_FILE:?STATUS_FILE must be set (passed via --export)}"

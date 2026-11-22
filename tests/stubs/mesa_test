@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Stub mesa_test: fake install/submit/test against a local git repository
+# (STUB_UPSTREAM), and canned `request_work` answers chosen by STUB_REQUEST_WORK.
+set -euo pipefail
+: "${STUB_STATE:?}"
+cmd="${1:-}"; shift || true
+
+sample_json() {  # $1 sha, $2 flags json, $3 converge_factor, $4 scope, $5 module, $6 name
+cat <<JSON
+{
+  "commit_sha": "$1",
+  "short_sha": "${1:0:7}",
+  "branch": "${STUB_BRANCH:-pulse-double-points-composition}",
+  "scope": "${4:-build}",
+  "test_case_module": ${5:-null},
+  "test_case_name": ${6:-null},
+  "flags": $2,
+  "converge_factor": ${3:-null},
+  "score": 14.6,
+  "reasons": ["on an active branch", "1 day(s) old", "no other computer on this commit yet"],
+  "dispatched_at": "2026-11-22T19:27:16Z",
+  "target_url": "https://testhub.mesastar.org/pulse-double-points-composition/commits/${1:0:7}"
+}
+JSON
+}
+PICKED="MESATestHub picked cc281a5 on pulse-double-points-composition: on an active branch; 1 day(s) old; no other computer on this commit yet"
+SAMPLE_SHA=cc281a57addd11fd46370c6c1584d2b1fc2734cd
+DEFAULT_FLAGS='{ "use_full_inlists": false, "use_fpe": false, "use_converge": false }'
+
+case "$cmd" in
+  request_work)
+    echo "request_work" >> "${STUB_STATE}/mesa_test_calls"
+    case "${STUB_REQUEST_WORK:-sample}" in
+      sample)         echo "$PICKED" >&2; sample_json "$SAMPLE_SHA" "$DEFAULT_FLAGS" ;;
+      sample_stdout)  echo "$PICKED";     sample_json "$SAMPLE_SHA" "$DEFAULT_FLAGS" ;;
+      nowork)         echo "MESATestHub has nothing for this computer to build right now." >&2; exit 3 ;;
+      minus3_stdout)  echo "-3" ;;
+      minus3_exit)    exit -3 ;;
+      error)          echo "Dispatch failed (HTTP 401): bad key" >&2; exit 1 ;;
+      test_scope)     sample_json "$SAMPLE_SHA" "$DEFAULT_FLAGS" null test '"star"' '"1M_pre_ms_to_wd"' ;;
+      fpe_converge)   sample_json "$SAMPLE_SHA" '{ "use_full_inlists": true, "use_fpe": true, "use_converge": true }' 0.50 ;;
+      converge_nofac) sample_json "$SAMPLE_SHA" '{ "use_full_inlists": false, "use_fpe": false, "use_converge": true }' ;;
+      unknown_flag)   sample_json "$SAMPLE_SHA" '{ "use_fpe": false, "use_gpu": true }' ;;
+      garbage)        echo "something went sideways" ;;
+      real)           echo "$PICKED" >&2; sample_json "${STUB_SHA:?}" "${STUB_FLAGS:-$DEFAULT_FLAGS}" ;;
+    esac ;;
+  install)
+    dir="" version=""
+    for a in "$@"; do case "$a" in --mesadir=*) dir="${a#--mesadir=}" ;; *) version="$a" ;; esac; done
+    git -C "$dir" init -q
+    git -C "$dir" fetch -q "${STUB_UPSTREAM:?}" '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+    if [[ -z "$version" ]]; then ref=origin/main
+    elif git -C "$dir" rev-parse -q --verify "origin/$version" > /dev/null; then ref="origin/$version"
+    else ref="$version"; fi
+    git -C "$dir" -c advice.detachedHead=false checkout -q "$ref"
+    for m in star astero binary; do
+        mkdir -p "$dir/$m/test_suite"
+        printf '#!/bin/sh\necho 2\n' > "$dir/$m/test_suite/count_tests"
+        chmod +x "$dir/$m/test_suite/count_tests"
+    done
+    if [[ -n "${STUB_BUILD_FAIL:-}" ]]; then echo "build failed" > "$dir/build.log"
+    else echo "MESA installation was successful" > "$dir/build.log"; fi
+    echo "install $version" >> "${STUB_STATE}/mesa_test_calls" ;;
+  submit) echo "submit $*" >> "${STUB_STATE}/mesa_test_calls" ;;
+  test)
+    echo "test $* skip=${MESA_SKIP_OPTIONAL-<unset>} fpe=${MESA_FPE_CHECKS_ON-<unset>} res=${MESA_TEST_SUITE_RESOLUTION_FACTOR-<unset>}" \
+        >> "${STUB_STATE}/tests_run" ;;
+  *) echo "stub mesa_test: unsupported command $cmd" >&2; exit 64 ;;
+esac
