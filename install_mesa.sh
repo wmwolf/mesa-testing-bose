@@ -92,6 +92,18 @@ mv "${MESA_TEST_DIR}" "${NAMED_DIR}"
 MESA_TEST_DIR="${NAMED_DIR}"
 echo "Worktree renamed to: ${MESA_TEST_DIR}  (commit ${COMMIT_SHA})"
 
+# ── Record the built SHA in the tested-commit log ─────────────────────────────
+# run_mesa_tests.sh guessed the SHA at launch (or couldn't); this is the commit
+# that was actually checked out. Never fail the build over bookkeeping.
+if [[ -n "${MESA_RUN_ID:-}" ]]; then
+    LOGGED_SHA=$(run_log get --run-id "${MESA_RUN_ID}" commit_sha 2>/dev/null || true)
+    if [[ "${LOGGED_SHA}" != "${COMMIT_SHA}" ]]; then
+        [[ -n "${LOGGED_SHA}" ]] && echo "NOTE: launch resolved ${LOGGED_SHA}, but built ${COMMIT_SHA}; updating log." >&2
+        run_log set --run-id "${MESA_RUN_ID}" commit_sha "${COMMIT_SHA}" \
+            || echo "WARNING: could not record commit SHA in ${MESA_RUN_LOG}." >&2
+    fi
+fi
+
 # ── Write the install path for the launcher job ───────────────────────────────
 echo "${MESA_TEST_DIR}" > "${STATUS_FILE}"
 echo "Wrote install path to ${STATUS_FILE}"

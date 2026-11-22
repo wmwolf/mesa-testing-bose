@@ -33,6 +33,15 @@ load_mesa_env
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${TEST_CPUS}}"
 
+# run_mesa_tests.sh passes an empty MESA_TEST_SUITE_RESOLUTION_FACTOR to mean
+# "not a convergence run". Unset it rather than leave it empty: mesa_test treats
+# any value, even "", as set.
+if [[ -z "${MESA_TEST_SUITE_RESOLUTION_FACTOR:-}" ]]; then
+    unset MESA_TEST_SUITE_RESOLUTION_FACTOR
+else
+    echo "Convergence run: MESA_TEST_SUITE_RESOLUTION_FACTOR=${MESA_TEST_SUITE_RESOLUTION_FACTOR}"
+fi
+
 echo "Running test ${SLURM_ARRAY_TASK_ID} for module '${MODULE}' from ${_MESA_TEST_DIR}"
 
 mesa_test test "${SLURM_ARRAY_TASK_ID}" \

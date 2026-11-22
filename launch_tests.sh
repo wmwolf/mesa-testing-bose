@@ -71,7 +71,7 @@ CLEANUP_JOB_ID=$(sbatch --parsable \
     --output="${CLEANUP_LOG}" \
     --error="${CLEANUP_LOG}" \
     --dependency="${DEPENDENCY_STR}" \
-    --export=ALL,MESA_TEST_DIR="${MESA_TEST_DIR}",STATUS_FILE="${STATUS_FILE}" \
+    --export=ALL,MESA_TEST_DIR="${MESA_TEST_DIR}",STATUS_FILE="${STATUS_FILE}",MESA_RUN_ID="${MESA_RUN_ID:-}",MESA_RUN_LOG="${MESA_RUN_LOG}" \
     "${SCRIPT_DIR}/cleanup_mesa.sh")
 
 echo ""

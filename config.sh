@@ -42,6 +42,21 @@ MESA_WORK_DIR="${MESA_WORK_DIR:-${HOME}/.mesa_test/work}"
 # /tmp is node-local, and ~ is not expanded by tools like mktemp.
 MESA_TMP_DIR="${MESA_TMP_DIR:-${MESA_WORK_DIR}/.tmp}"
 
+# ── Tested-commit log ─────────────────────────────────────────────────────────
+# CSV with one row per run_mesa_tests.sh launch (see README.md). Machine-local
+# state, kept next to mesa_test's own config and mirror rather than in this
+# repository or under MESA_WORK_DIR (which may live on purgeable scratch).
+# Must be on storage the compute nodes can write: cleanup_mesa.sh fills in the
+# completion time from a compute node.
+MESA_RUN_LOG="${MESA_RUN_LOG:-${HOME}/.mesa_test/tested_commits.csv}"
+
+# Local mirror of the MESA repository that mesa_test maintains. Used to resolve
+# branch names to commit SHAs before launching.
+MESA_MIRROR_DIR="${MESA_MIRROR_DIR:-${HOME}/.mesa_test/mirror}"
+
+# Resolution factor for --converge when none is given (mesa_test's default).
+DEFAULT_CONVERGE_FACTOR="0.8"
+
 # ── Environment setup ─────────────────────────────────────────────────────────
 # Call this at the top of any script that invokes mesa_test or runs MESA tests.
 # Loads required modules and scrubs variables that are useful for interactive
@@ -55,3 +70,10 @@ load_mesa_env() {
     unset MESA_CACHES_DIR
 }
 export -f load_mesa_env
+
+# ── Tested-commit log helper ──────────────────────────────────────────────────
+# Thin wrapper around run_log.py (see that file for subcommands). Requires
+# SCRIPT_DIR to point at this repository, as every script here arranges.
+run_log() {
+    python3 "${SCRIPT_DIR}/run_log.py" --log "${MESA_RUN_LOG}" "$@"
+}

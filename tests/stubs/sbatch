@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Stub sbatch: runs the job script synchronously (instead of queueing it),
+# honouring --export=ALL,K=V,..., --output (with %a), --array, and
+# --dependency=afterok/afterany. Prints a fake job ID, as --parsable does.
+set -uo pipefail
+: "${STUB_STATE:?}"
+[[ -n "${STUB_SBATCH_FAIL:-}" ]] && { echo "sbatch: error: stub failure" >&2; exit 1; }
+
+exports="" output="/dev/null" array="" dependency="" script=""
+for a in "$@"; do
+    case "$a" in
+        --export=*)     exports="${a#--export=}" ;;
+        --output=*)     output="${a#--output=}" ;;
+        --array=*)      array="${a#--array=}" ;;
+        --dependency=*) dependency="${a#--dependency=}" ;;
+        --*)            ;;
+        *)              script="$a" ;;
+    esac
+done
+echo "$script" >> "${STUB_STATE}/sbatch_calls"
+
+id_file="${STUB_STATE}/next_job_id"
+jid=$(( $(cat "$id_file" 2>/dev/null || echo 1000) + 1 ))
+echo "$jid" > "$id_file"
+
+env_args=()
+IFS=',' read -r -a items <<< "$exports"
+for item in "${items[@]}"; do [[ "$item" == ALL ]] || env_args+=("$item"); done
+
+# afterok: skip (as Slurm cancels) if any dependency failed.
+run=1
+if [[ "$dependency" == afterok:* ]]; then
+    IFS=':' read -r -a deps <<< "${dependency#afterok:}"
+    for d in "${deps[@]}"; do
+        [[ "$(cat "${STUB_STATE}/job_${d}.status" 2>/dev/null)" == 0 ]] || run=0
+    done
+fi
+
+status=0
+if [[ $run == 1 ]]; then
+    if [[ -n "$array" ]]; then
+        for (( i=${array%-*}; i<=${array#*-}; i++ )); do
+            env "${env_args[@]}" SLURM_ARRAY_TASK_ID="$i" bash "$script" > "${output//%a/$i}" 2>&1 || status=1
+        done
+    else
+        env "${env_args[@]}" bash "$script" > "$output" 2>&1 || status=$?
+    fi
+else
+    status=cancelled
+fi
+echo "$status" > "${STUB_STATE}/job_${jid}.status"
+echo "$jid"
